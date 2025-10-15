@@ -22,8 +22,8 @@ phases:
       - ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPOSITORY}"
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
       - echo "Logging into ECR: $ECR_URI"
-      - chmod +x ecr_login.sh  # Make the script executable
-      - ./ecr_login.sh          # Execute the script
+      - chmod +x ecr_login.sh
+      - ./ecr_login.sh
 
   build:
     commands:
