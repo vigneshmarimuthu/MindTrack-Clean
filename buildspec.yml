@@ -1,0 +1,50 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "us-east-1"
+    ECR_REPOSITORY: "mindtrack-frontend"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+      docker: 20
+    commands:
+      - echo "Installing dependencies (if any)"
+      - npm --version || true
+
+  pre_build:
+    commands:
+      - echo "Setting up environment variables"
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REGION=${AWS_DEFAULT_REGION}
+      - ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPOSITORY}"
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
+      - echo "Logging into ECR: $ECR_URI"
+      - chmod +x ecr_login.sh  # Make the script executable
+      - ./ecr_login.sh          # Execute the script
+
+  build:
+    commands:
+      - echo "Building React app"
+      - npm ci
+      - npm run build
+      - echo "Building Docker image"
+      - docker build -t ${ECR_URI}:${IMAGE_TAG} .
+      - docker tag ${ECR_URI}:${IMAGE_TAG} ${ECR_URI}:latest
+
+  post_build:
+    commands:
+      - echo "Pushing Docker images to ECR"
+      - docker push ${ECR_URI}:${IMAGE_TAG}
+      - docker push ${ECR_URI}:latest
+      - echo "Preparing Kubernetes manifest"
+      - mkdir -p k8s
+      - sed "s|__IMAGE__|${ECR_URI}:${IMAGE_TAG}|g" k8s/deployment.template.yaml > k8s/deployment.yaml
+      - ls -la k8s
+
+artifacts:
+  files:
+    - k8s/deployment.yaml
+    - k8s/service.yaml
